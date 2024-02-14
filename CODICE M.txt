@@ -1,0 +1,48 @@
+= Excel.Workbook(File.Contents("C:\Users\LUCA\Downloads\M3S1E2.xlsx"), null, true)
+= Origine{[Item="Ordini",Kind="Sheet"]}[Data]
+= Table.PromoteHeaders(Ordini_Sheet, [PromoteAllScalars=true])
+= Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Data,Ordine", type text}, {"Collaboratore", type text}, {"Regione", type text}, {"Data", type date}, {"Categoria", type text}, {"Prodotto", type text}, {"Column7", type any}, {"Prezzo,unitario", type number}, {"Quantità", Int64.Type}})
+PULIZIA DATI
+Table.RenameColumns(#"Ordinate righe1",{{"Data,Ordine", "DATA ORDINE"}})
+= Table.ReplaceValue(#"Modificato tipo"," ","",Replacer.ReplaceText,{"Regione"})
+= Table.ReplaceValue(#"Sostituito valore"," ","",Replacer.ReplaceText,{"Categoria", "Prodotto"})
+AGGIUNGO COLONNA TOTALE MOLTIPICANDO PREZZO UNITARIO E QUANTITA
+= Table.AddColumn(#"Sostituito valore1", "TOTALE", each [#"Prezzo,unitario"]*[Quantità])
+= Table.RemoveColumns(#"Aggiunta colonna personalizzata",{"Column7"})
+= Table.ReplaceValue(#"Ordinate righe","  ","",Replacer.ReplaceText,{"Collaboratore"})
+RIMPIAZZO I NULLI CON GLI ZERO IN QUANTITA
+= Table.ReplaceValue(#"Sostituito valore2",null,0,Replacer.ReplaceValue,{"Quantità"})
+FILTRO
+= Table.Sort(#"Sostituito valore3",{{"Collaboratore", Order.Ascending}})
+=  Table.SelectRows(#"Rinominate colonne", each ([Collaboratore] = "Gorgini Luca"))
+AGGIUNGO COLONNA IVA
+= Table.AddColumn(#"Filtrate righe", "IVA", each [TOTALE]*0.22)
+MERGE DI COLONNE
+= Table.CombineColumns(#"Aggiunta colonna personalizzata1",{"Prodotto", "Categoria"},Combiner.CombineTextByDelimiter(" ", QuoteStyle.None),"CATPROD")
+CREO COLONNA CON "TROVATO" SE LA QUANTITA è MAGGIORE DI 20
+= Table.AddColumn(#"Merge di colonne", "SE", each if [Quantità] > 20 then "TROVATO" else "NON TROVATO")
+= Table.TransformColumnTypes(#"se > 20",{{"SE", type text}})
+= Table.Group(#"Testo in minuscolo", {"Collaboratore"}, {{"Conteggio", each List.Sum([Quantità]), type nullable number}})
+DUPICO SULLA SNISTRA LA QUERY NUOVI ORDINI E LA CHIAMO SECONDA, IN TRASFORMA SELEZIONO RAGGRUPPA PER COLLABORATORE E CREO UNA COLONNA SOMMA QUANTITA
+PER VISUALIZZARE GLI ERRORI, LE COLONNE VUOTE ED ALTRI DATI, SELEZIONO VISUALIZZA IN ALTO A SINISITRA. PER VERIFICARE IL TIPO DI DATI (ES TESTO) VADO SU TRASFORMA. 
+= Table.TransformColumnTypes(#"Raggruppate righe",{{"Quantità", Int64.Type}})
+REGIONE IN MAIUSCOLO
+= Table.TransformColumns(#"Modificato tipo1",{{"Regione", Text.Upper, type text}})
+ISOLO IL NUMERO DEL MESE IN UNA NUOVA COLONNA E POI TRAMITE CODICE FILTRO PER OGNI ANNO GLI ORDINI AVVENUTI DOPO APRILE
+= Table.AddColumn(#"REGIONE MAIUSCOLA", "MESE", each Date.Month([Data]))
+= Table.AddColumn(#"Aggiunta colonna personalizzata2", "APRILE", each if [MESE] > 4 then "DOPO APRILE" else "PRIMA DI APRILE")
+= Table.TransformColumnTypes(#"Colonna condizionale aggiunta",{{"APRILE", type text}})
+= Table.RenameColumns(#"Modificato tipo2",{{"DATA ORDINE", "COPROD"}})
+DIVIDO LA COLONNA CODPROD IN LETTERE E NUMERI TRAMITE DIVIDI COLONNA IN TRASFORMA
+= Table.SplitColumn(#"Rinominate colonne1", "COPROD", Splitter.SplitTextByCharacterTransition((c) => not List.Contains({"0".."9"}, c), {"0".."9"}), {"COPROD.1", "COPROD.2"})
+= Table.ReplaceValue(#"Dividi colonna per passaggio carattere","PIUM","PIUMA",Replacer.ReplaceText,{"CATPROD"})
+COLLABORATORI IN MINUSCOLO
+= Table.TransformColumns(#"Sostituito valore4",{{"Collaboratore", Text.Lower, type text}})
+RAGGRUPPAMENTO FATTURATO PER REGIONE
+= Table.Group(#"Testo in maiuscolo", {"Regione"}, {{"Conteggio", each List.Sum([TOTALE]), type number}})
+CONTARE RIGHE CON CONTEGGIO RIGHE SU TRASFORMA
+= Table.RowCount(#"Raggruppate righe")
+ASSOCIO AD AUTO 1 E A MOTO 2 TRAMITE CODICE IN AGGIUNGI COLONNA PERSONALIZZATA
+= Table.TransformColumnTypes(#"Suddividi colonna in base al delimitatore",{{"COPROD.1", type text}, {"COPROD.2", Int64.Type}, {"CATPROD.1", type text}, {"CATPROD.2", type text}})
+= Table.AddColumn(#"Modificato tipo3", "Auto/Moto", each if[CATPROD.2]= "Auto" then 1 else if [CATPROD.2]= "Moto" then 2 else null)
+
